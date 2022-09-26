@@ -1,6 +1,8 @@
 package cn.brk2outside.laser.client;
 
 import cn.brk2outside.laser.client.event.MsgArrivalEvent;
+import com.sun.istack.internal.NotNull;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.ApplicationEventPublisherAware;
@@ -19,6 +21,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Slf4j
 public class Client implements Closeable, ApplicationEventPublisherAware {
@@ -38,7 +42,9 @@ public class Client implements Closeable, ApplicationEventPublisherAware {
         this.init();
     }
 
-    public ByteBuffer doWrite(byte[] command) throws IOException {
+    public void doWrite(byte[] command) throws IOException {
+        checkConnection();
+
         readWrite.select(TimeUnit.SECONDS.toMillis(1));
         Set<SelectionKey> selectionKeys = readWrite.selectedKeys();
         Iterator<SelectionKey> keyItr = selectionKeys.iterator();
@@ -47,26 +53,11 @@ public class Client implements Closeable, ApplicationEventPublisherAware {
             if (key.isWritable()) {
                 SocketChannel writeChannel = (SocketChannel) key.channel();
                 ByteBuffer commandBuff = ByteBuffer.wrap(command);
-                commandBuff.flip();
                 writeChannel.write(commandBuff);
-                writeChannel.shutdownOutput();
                 break;
             }
             keyItr.remove();
         }
-        do {
-            readWrite.select(TimeUnit.SECONDS.toMillis(1));
-            Set<SelectionKey> readKeys = readWrite.selectedKeys();
-            for (SelectionKey key : readKeys) {
-                if (key.isReadable()) {
-                    ByteBuffer resp = ByteBuffer.allocate(1024);
-                    SocketChannel readChannel = (SocketChannel) key.channel();
-                    readChannel.read(resp);
-                    readChannel.shutdownInput();
-                    return (ByteBuffer) resp.flip();
-                }
-            }
-        } while (true);
     }
 
     public void startListen() {
@@ -94,15 +85,14 @@ public class Client implements Closeable, ApplicationEventPublisherAware {
         if (null == channel || !channel.isOpen()) {
             channel = SocketChannel.open();
             channel.connect(this.address);
+            channel.configureBlocking(false);
+            channel.register(readOnly, SelectionKey.OP_READ);
+            channel.register(readWrite, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
         }
     }
 
     private void init() throws IOException {
-        channel = SocketChannel.open();
-        channel.connect(this.address);
-        channel.configureBlocking(false);
-        channel.register(readOnly, SelectionKey.OP_READ);
-        channel.register(readWrite, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+        checkConnection();
     }
 
 
@@ -120,6 +110,20 @@ public class Client implements Closeable, ApplicationEventPublisherAware {
         }
     }
 
+    private void publish(@NotNull ByteBuffer msg) {
+        ApplicationEventPublisher publisher = PUBLISHER_CONTEXT.get();
+        if (null == publisher) {
+            return;
+        }
+        assert null != msg;
+        publisher.publishEvent(
+                new MsgArrivalEvent(
+                        msg,
+                        ((InetSocketAddress)this.address).getHostString()
+                )
+        );
+    }
+
     @Override
     public void setApplicationEventPublisher(ApplicationEventPublisher applicationEventPublisher) {
         Client.PUBLISHER_CONTEXT.set(applicationEventPublisher);
@@ -128,28 +132,27 @@ public class Client implements Closeable, ApplicationEventPublisherAware {
     private final class WaitMessageArrivalTask implements Runnable {
 
         @Override
+        @SneakyThrows
         public void run() {
             while (!TERMINATED.get()) {
-                ApplicationEventPublisher publisher = PUBLISHER_CONTEXT.get();
-                if (null != publisher) {
-                    try {
-                        readOnly.select(TimeUnit.SECONDS.toMillis(1));
-                        Set<SelectionKey> selectionKeys = readOnly.selectedKeys();
-                        for (SelectionKey key : selectionKeys) {
-                            if (key.isReadable()) {
-                                ByteBuffer msg = ByteBuffer.allocate(1024);
-                                SocketChannel readChannel = (SocketChannel) key.channel();
-                                readChannel.read(msg);
-                                msg.flip();
-                                publisher.publishEvent(
-                                        new MsgArrivalEvent(msg, ((InetSocketAddress)Client.this.address).getHostString())
-                                );
-                                readChannel.shutdownInput();
+                try {
+                    checkConnection();
+
+                    readOnly.select(TimeUnit.SECONDS.toMillis(1));
+                    Set<SelectionKey> selectionKeys = readOnly.selectedKeys();
+                    for (SelectionKey key : selectionKeys) {
+                        if (key.isValid() && key.isReadable()) {
+                            ByteBuffer msg = ByteBuffer.allocate(1024);
+                            SocketChannel readChannel = (SocketChannel) key.channel();
+                            readChannel.read(msg);
+                            msg.flip();
+                            if (msg.limit() > 0) {
+                                publish(msg);
                             }
                         }
-                    } catch (IOException e) {
-                        log.error("Error when listening to laser message", e);
                     }
+                } catch (IOException e) {
+                    log.error("Error when listening to laser message", e);
                 }
                 Thread.yield();
             }
