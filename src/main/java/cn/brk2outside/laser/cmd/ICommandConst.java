@@ -14,9 +14,4 @@ public interface ICommandConst {
     int EXT_MSG = 0xFFFF;
 
 
-    public static void main(String[] args) {
-        char c = Character.reverseBytes((char) READ_STAT);
-        System.out.println((int)c);
-    }
-
 }

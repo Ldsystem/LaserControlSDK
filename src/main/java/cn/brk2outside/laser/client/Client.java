@@ -16,6 +16,7 @@ import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -37,12 +38,8 @@ public class Client implements Closeable, ApplicationEventPublisherAware {
         this.init();
     }
 
-    public Client(String host, int port) throws IOException {
-        this.address = new InetSocketAddress(host, port);
-        this.init();
-    }
-
     public ByteBuffer doWrite(byte[] command) throws IOException {
+        readWrite.select(TimeUnit.SECONDS.toMillis(1));
         Set<SelectionKey> selectionKeys = readWrite.selectedKeys();
         Iterator<SelectionKey> keyItr = selectionKeys.iterator();
         while (keyItr.hasNext()) {
@@ -52,17 +49,20 @@ public class Client implements Closeable, ApplicationEventPublisherAware {
                 ByteBuffer commandBuff = ByteBuffer.wrap(command);
                 commandBuff.flip();
                 writeChannel.write(commandBuff);
+                writeChannel.shutdownOutput();
                 break;
             }
             keyItr.remove();
         }
         do {
+            readWrite.select(TimeUnit.SECONDS.toMillis(1));
             Set<SelectionKey> readKeys = readWrite.selectedKeys();
             for (SelectionKey key : readKeys) {
                 if (key.isReadable()) {
                     ByteBuffer resp = ByteBuffer.allocate(1024);
                     SocketChannel readChannel = (SocketChannel) key.channel();
                     readChannel.read(resp);
+                    readChannel.shutdownInput();
                     return (ByteBuffer) resp.flip();
                 }
             }
@@ -100,6 +100,7 @@ public class Client implements Closeable, ApplicationEventPublisherAware {
     private void init() throws IOException {
         channel = SocketChannel.open();
         channel.connect(this.address);
+        channel.configureBlocking(false);
         channel.register(readOnly, SelectionKey.OP_READ);
         channel.register(readWrite, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
     }
@@ -131,10 +132,11 @@ public class Client implements Closeable, ApplicationEventPublisherAware {
             while (!TERMINATED.get()) {
                 ApplicationEventPublisher publisher = PUBLISHER_CONTEXT.get();
                 if (null != publisher) {
-                    Set<SelectionKey> selectionKeys = readOnly.selectedKeys();
-                    for (SelectionKey key : selectionKeys) {
-                        if (key.isReadable()) {
-                            try {
+                    try {
+                        readOnly.select(TimeUnit.SECONDS.toMillis(1));
+                        Set<SelectionKey> selectionKeys = readOnly.selectedKeys();
+                        for (SelectionKey key : selectionKeys) {
+                            if (key.isReadable()) {
                                 ByteBuffer msg = ByteBuffer.allocate(1024);
                                 SocketChannel readChannel = (SocketChannel) key.channel();
                                 readChannel.read(msg);
@@ -142,10 +144,11 @@ public class Client implements Closeable, ApplicationEventPublisherAware {
                                 publisher.publishEvent(
                                         new MsgArrivalEvent(msg, ((InetSocketAddress)Client.this.address).getHostString())
                                 );
-                            } catch (IOException e) {
-                                log.error("Error when listening to laser message", e);
+                                readChannel.shutdownInput();
                             }
                         }
+                    } catch (IOException e) {
+                        log.error("Error when listening to laser message", e);
                     }
                 }
                 Thread.yield();
