@@ -1,21 +1,23 @@
-package cn.brk2outside.laser.cmd;
+package cn.brk2outside.laser.constant;
 
 import lombok.Getter;
 
-import static cn.brk2outside.laser.cmd.ValueTypeEnum.*;
+import static cn.brk2outside.laser.constant.ValueTypeEnum.*;
 
 public enum CommandEnum {
     STX         (   0x02,   U_BYTE),
     ETX         (   0x03,   U_BYTE),
-    SYSTEM_STAT (   0x0070, DWORD),
-    START_PRINT (   0x002D, DWORD),
-        WORK_MODE       (   0xFFFF, DWORD),
-        DE_AVT_BATCH    (   0x0000, DWORD),
-    STOP_PRINT  (   0x002E, DWORD),
-    SESSION_CTL (   0x0080, DWORD),
-        START_SESSION   (0x0001, DWORD),
-        END_SESSION     (0x0000, DWORD),
-
+    SYSTEM_STAT (   0x0070, WORD),
+    START_PRINT (   0x002D, WORD),
+        WORK_MODE       (   0xFFFF, WORD),
+        DE_AVT_BATCH    (   0x0000, WORD),
+    STOP_PRINT  (   0x002E, WORD),
+    SESSION_CTL (   0x0080, WORD),
+        START_SESSION   (0x0001, WORD),
+        END_SESSION     (0x0000, WORD),
+    EXTEND_CMD  (0x04, U_BYTE),
+    SENDING_CODE(0x0141, WORD),
+        SENDING_OPTION_SET(0x00, U_BYTE)
     ;
 
     CommandEnum(int value, ValueTypeEnum valueType) {
@@ -31,7 +33,7 @@ public enum CommandEnum {
 
     public byte[] getBytes() {
         switch (valueType) {
-            case DWORD:
+            case WORD:
                 return new byte[] {
                         (byte) (value & 0xFF),
                         (byte) ((value >>> 8) & 0xFF)
@@ -40,7 +42,7 @@ public enum CommandEnum {
                 return new byte[] {
                         (byte) (value & 0xFF)
                 };
-            case U_INT:
+            case DWORD:
                 return new byte[] {
                         (byte) (value & 0xFF),
                         (byte) ((value >>> 8) & 0xFF),

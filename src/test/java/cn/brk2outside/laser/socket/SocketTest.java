@@ -23,7 +23,7 @@ public class SocketTest extends LaserCommApplicationTests {
     public void testReceive() throws IOException, InterruptedException {
         client.startListen();
         client.doWrite("hello".getBytes(StandardCharsets.UTF_8));
-        TimeUnit.SECONDS.sleep(15);
+        TimeUnit.SECONDS.sleep(5);
     }
 
 }
