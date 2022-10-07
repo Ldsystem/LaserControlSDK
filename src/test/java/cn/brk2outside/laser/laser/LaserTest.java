@@ -34,7 +34,7 @@ public class LaserTest extends LaserCommApplicationTests {
 
     @Test
     public void testWriteCode() throws IOException, InterruptedException {
-        int fieldNumber = 0;
+        int fieldNumber = 1;
         String code = "SSSSSS";
         ByteBuffer command = sendCodeCommand(fieldNumber, code);
         client.doWrite(command);

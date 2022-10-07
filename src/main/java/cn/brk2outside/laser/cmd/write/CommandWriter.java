@@ -37,6 +37,7 @@ public class CommandWriter {
         command.put((byte) fieldIndex);
         command.put(bytes);
         command.put(ETX.getBytes());
+        command.flip();
         return command;
     }
 

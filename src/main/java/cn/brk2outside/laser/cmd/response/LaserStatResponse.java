@@ -1,12 +1,9 @@
 package cn.brk2outside.laser.cmd.response;
 
-import lombok.Getter;
-
 import java.nio.ByteBuffer;
 
 import static cn.brk2outside.laser.constant.CommandEnum.ETX;
 
-@Getter
 public class LaserStatResponse extends IResponse {
 
     /** 1. */
@@ -77,6 +74,7 @@ public class LaserStatResponse extends IResponse {
                 "Ok Prints: \t\t\t\t\t\t" + this.okPrints +
                 "\nAll Prints: \t\t\t\t\t" + this.allPrints +
                 "\nTotal Prints: \t\t\t\t\t" + this.totalPrints +
+                "\nCopies: \t\t\t\t\t\t" + this.copies +
                 "\n=============== Status ======================" +
                 "\nLaser Mode: \t\t\t\t\t" + String.format("0x%02x", this.mode) +
                 "\nPrinting Mode: \t\t\t\t\t" + (this.startType & 0x01) +
@@ -88,6 +86,7 @@ public class LaserStatResponse extends IResponse {
                 "\nReserved 06: \t\t\t\t\t" + (this.startType & 0x40) +
                 "\nReserved 07: \t\t\t\t\t" + (this.startType & 0x80) +
                 "\nAlarm Status: \t\t\t\t\t" + String.format("0x%04x", this.alarmStatus) +
+                "\nAlarm Mask: \t\t\t\t\t" + String.format("0x%08x", this.mask) +
                 "\nSignal State: \t\t\t\t\t" + String.format("0x%08x", this.signalState) +
                 "\n============================================="
                 ;
@@ -95,12 +94,28 @@ public class LaserStatResponse extends IResponse {
 
     public boolean ready() {
         return this.mode == 0x00
-                && (this.startType & 0x01) > 0
+                && ((this.startType & 0x01)
+                        | ((this.startType & 0x02) >> 1)) == 1
                 && (this.alarmStatus == 0x0000);
     }
 
+    /**
+     * No error
+     * */
     public boolean ok() {
         return this.alarmStatus == 0x0000;
+    }
+
+    public int errorStat() {
+        return this.alarmStatus;
+    }
+
+    public int errorCode() {
+        return this.mask;
+    }
+
+    public boolean printing() {
+        return (this.startType & 0x02) == 0;
     }
 
 }

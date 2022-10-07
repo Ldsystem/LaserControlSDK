@@ -1,7 +1,6 @@
 package cn.brk2outside.laser.client;
 
 import cn.brk2outside.laser.client.event.MsgArrivalEvent;
-import com.sun.istack.internal.NotNull;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -103,6 +102,10 @@ public class Client implements Closeable, ApplicationEventPublisherAware {
         TERMINATED.set(true);
     }
 
+    public String getLaserIP() {
+        return ((InetSocketAddress) this.address).getHostString();
+    }
+
     @Override
     public void close() throws IOException {
         TERMINATED.set(true);
@@ -116,7 +119,7 @@ public class Client implements Closeable, ApplicationEventPublisherAware {
         }
     }
 
-    private void publish(@NotNull ByteBuffer msg) {
+    private void publish(ByteBuffer msg) {
         ApplicationEventPublisher publisher = PUBLISHER_CONTEXT.get();
         if (null == publisher) {
             return;
