@@ -29,7 +29,6 @@ public class CommandWriter {
         command.put(SENDING_CODE.getBytes());
         byte[] bytes = code.getBytes(StandardCharsets.US_ASCII);
         char byteCount = (char) (2 + bytes.length);
-        log.info("writing command {} of {} bytes", code, (int)byteCount);
         command.putChar(
                 Character.reverseBytes(byteCount)
         );
