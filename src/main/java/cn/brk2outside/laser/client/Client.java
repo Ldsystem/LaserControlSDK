@@ -147,7 +147,7 @@ public class Client implements Closeable, ApplicationEventPublisherAware {
                 try {
                     checkConnection();
 
-                    readOnly.select(TimeUnit.SECONDS.toMillis(1));
+                    readOnly.select(TimeUnit.SECONDS.toMillis(200));
                     Set<SelectionKey> selectionKeys = readOnly.selectedKeys();
                     for (SelectionKey key : selectionKeys) {
                         if (key.isValid() && key.isReadable()) {
