@@ -1,5 +1,7 @@
 package cn.brk2outside.laser.cmd.response;
 
+import lombok.Getter;
+
 import java.nio.ByteBuffer;
 
 import static cn.brk2outside.laser.constant.CommandEnum.ETX;
@@ -7,8 +9,10 @@ import static cn.brk2outside.laser.constant.CommandEnum.ETX;
 public class LaserStatResponse extends IResponse {
 
     /** 1. */
+    @Getter
     private int okPrints;
     /** 2. */
+    @Getter
     private int allPrints;
     /** 4.1 */
     private byte mode;
@@ -33,6 +37,10 @@ public class LaserStatResponse extends IResponse {
     private int alarmCode;
     private int mask;
     private int signalState;
+
+    public int errorPrints() {
+        return this.allPrints - this.okPrints;
+    }
 
     @Override
     void doRead(ByteBuffer buffer) {
